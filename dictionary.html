@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dictionary</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
+    <style>
+        .bg-container {
+            background-color: white;
+            border-radius: 10px;
+            font-family: "Roboto", sans-serif;
+            padding: 15px;
+            width: 90vw;
+            max-width: 600px;
+            margin-top: 5vh;
+            min-height: 50vh;
+            box-sizing: border-box;
+        }
+        .input {
+            width: 300px;
+            height: 40px;
+            border-radius: 5px;
+            padding-left: 10px;
+            border: 1px solid #4a7ede;
+            border-bottom: 3px solid #4a7ede;
+            margin-right: 10px;
+        }
+        .definition-container {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ffffff;
+            border-bottom: 4px solid #4a7ede;
+            box-shadow: 1px 1px 10px #4a7ede;
+            width: 100%;
+            font-family: "Roboto", sans-serif;
+            font-size: 18px;
+            font-weight: 200;
+            overflow-y: auto;
+        }
+        .example-container {
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ffffff;
+            border-bottom: 4px solid #5e6572;
+            box-shadow: 1px 1px 10px #2d394e;
+            width: 100%;
+            font-family: "Roboto", sans-serif;
+            overflow-y: auto;
+        }
+        .result-word {
+            font-family: "Roboto", sans-serif;
+        }
+        .phonetic {
+            font-family: "Roboto", sans-serif;
+            font-size: 14px;
+            margin-right: 10px;
+            color: #979ba1;
+        }
+        .parts-of-speech {
+            font-family: "Roboto", sans-serif;
+            font-size: 14px;
+            color: #979ba1;
+            display: block;
+        }
+        .audio-button {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+        }
+        .audio-button:disabled {
+            cursor: not-allowed;
+        }
+        body{
+            background-image:url("background-image.jpg");
+            background-size:cover;
+        }
+    </style>
+</head>
+<body style="background-color: #1688df;" class="d-flex flex-row justify-content-center">
+    <div class="bg-container d-flex flex-column justify-content-center align-items-center">
+        <!-- Added Dictionary Logo -->
+        <div class="logo-container mb-3">
+            <img src="dictionarylogo.png" alt="Dictionary Logo" style="width: 200px; height: auto;">
+        </div>
+        <div class="search-container mb-3">
+            <input class="input" id="dictionaryInput" type="text" placeholder="Enter a word to search" aria-label="Word search input"/>
+            <button class="btn btn-primary search-button" id="searchButton" style="background-color: #4a7ede;">Search</button>
+        </div>
+        <div class="result-container mt-3" id="resultContainer"></div>
+        <audio id="sound"></audio>
+    </div>
+    <script>
+        const resultContainerEl = document.getElementById("resultContainer");
+        const sound = document.getElementById("sound");
+        const searchButtonEl = document.getElementById("searchButton");
+        const dictionaryInputEl = document.getElementById("dictionaryInput");
+
+        const url = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+
+        // Enable search on Enter key
+        dictionaryInputEl.addEventListener("keypress", (event) => {
+            if (event.key === "Enter") {
+                searchButtonEl.click();
+            }
+        });
+
+        searchButtonEl.addEventListener("click", () => {
+            let inputValue = dictionaryInputEl.value.trim();
+            if (!inputValue) {
+                resultContainerEl.innerHTML = '<p class="text-danger">Please enter a word.</p>';
+                return;
+            }
+
+            resultContainerEl.innerHTML = '<p>Loading...</p>'; // Loading indicator
+            fetch(url + encodeURIComponent(inputValue))
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error(`Word not found or network error: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then((data) => {
+                    if (!data || !data[0] || !data[0].meanings || !data[0].meanings[0]) {
+                        throw new Error("Incomplete data received from API.");
+                    }
+                    const audioUrl = data[0].phonetics.find(p => p.audio)?.audio || '';
+                    let hasExample = false;
+                    let meaningsHtml = data[0].meanings.map((meaning, mIndex) => {
+                        let definitionsHtml = meaning.definitions.map((def, dIndex) => {
+                            if (def.example) hasExample = true;
+                            return `
+                                <div class="definition-container mt-2">
+                                    <p>Definition: ${def.definition || 'Definition not available'}</p>
+                                    <div class="example-container">
+                                        <p>Example: ${def.example || 'Example not available'}</p>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                        return `
+                            <div class="meaning-container mb-3">
+                                <span class="parts-of-speech">Part of Speech: ${meaning.partOfSpeech || 'Not available'}</span>
+                                ${definitionsHtml}
+                            </div>
+                        `;
+                    }).join('');
+                    if (!hasExample) {
+                        meaningsHtml += '<p class="text-muted">No example sentences available for this word.</p>';
+                    }
+                    resultContainerEl.innerHTML = `
+                        <div class="d-flex flex-row justify-content-between align-items-center">
+                            <h4 class="result-word" id="resultWord">${data[0].word}</h4>
+                            <button class="audio-button" aria-label="Play pronunciation" onclick="playSound('${audioUrl}')" ${audioUrl ? '' : 'disabled'}>
+                                <i class="fa-solid fa-volume-high" style="color: ${audioUrl ? '#1688df' : '#979ba1'};"></i>
+                            </button>
+                        </div>
+                        <span class="phonetic" id="resultPhonetic">${data[0].phonetic || data[0].phonetics.find(p => p.text)?.text || 'Phonetic not available'}</span>
+                        ${meaningsHtml}`;
+                    if (audioUrl) {
+                        sound.src = audioUrl;
+                    }
+                })
+                .catch((error) => {
+                    resultContainerEl.innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                });
+        });
+
+        function playSound(audioUrl) {
+            if (audioUrl) {
+                sound.src = audioUrl;
+                sound.play().catch(() => {
+                    alert("Error playing audio.");
+                });
+            } else {
+                alert("No audio available for this word.");
+            }
+        }
+    </script>
+</body>
+</html>
